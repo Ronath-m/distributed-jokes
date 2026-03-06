@@ -54,6 +54,22 @@ terraform init && terraform plan && terraform apply
 
 Outputs: Kong VM private IP, VNet ID. Add more VMs by copying the `kong_vm` block in `main.tf` and changing name/NIC (same subnet for private networking).
 
+### If /app/joke shows "invalid response from upstream"
+
+1. **Redeploy with latest code** (joke service now listens immediately so Kong gets a valid response; DB init runs in background). Push your repo, then run the command **on the Joke VM** (not on your laptop): Azure Portal → **jokes-joke-vm** → Run command → RunShellScript, and paste:
+   ```bash
+   cd /home/azureuser/app && git pull && cd deploy/joke && RABBITMQ_IP=10.0.1.5 docker compose up -d --build
+   ```
+   Use the `rabbitmq` value from `terraform output private_ips` if different.
+
+2. **Check Joke VM** (Run command on `jokes-joke-vm`):
+   ```bash
+   docker ps -a
+   tail -80 /var/log/joke-compose.log
+   docker logs $(docker ps -aq -f name=joke | head -1) 2>/dev/null || true
+   curl -s http://localhost:3000/health
+   ```
+
 ## Requirements
 
 - Node 18+

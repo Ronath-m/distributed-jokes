@@ -13,8 +13,11 @@ const { initSchema, seedIfEmpty, getJokesByType, getTypes } = require('./db');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Upstream is ready only after DB init (so Kong gets valid responses immediately)
+let dbReady = false;
+
 app.use(express.json());
-// Health check for Kong / load balancers
+// Health check – always 200 so Kong sees upstream as healthy
 app.get('/health', (req, res) => {
   res.status(200).type('text/plain').send('ok');
 });
@@ -27,6 +30,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // GET /joke/:type?count – one or more random jokes (count optional)
 app.get('/joke/:type', async (req, res) => {
+  if (!dbReady) {
+    return res.status(503).json({ error: 'Starting up', message: 'Database not ready yet' });
+  }
   try {
     const type = String(req.params.type || '').trim() || 'any';
     const count = Math.min(Math.max(parseInt(req.query.count, 10) || 1, 100), 100);
@@ -40,6 +46,9 @@ app.get('/joke/:type', async (req, res) => {
 
 // GET /types – all joke types (for dropdowns)
 app.get('/types', async (req, res) => {
+  if (!dbReady) {
+    return res.status(503).json({ error: 'Starting up', types: [] });
+  }
   try {
     const types = await getTypes();
     res.json(types);
@@ -49,30 +58,32 @@ app.get('/types', async (req, res) => {
   }
 });
 
-// Retry DB init so we survive MySQL not ready at first boot (e.g. on Azure VM)
+// Start HTTP server immediately so Kong never gets "connection refused"
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Joke service listening on ${PORT}`);
+});
+
+// Retry DB init in background so we survive MySQL not ready at first boot (e.g. on Azure VM)
 const MAX_DB_RETRIES = 30;
 const RETRY_MS = 2000;
 
 function tryDbInit(attempt = 1) {
   return initSchema()
     .then(() => seedIfEmpty())
-    .then(() => true)
+    .then(() => {
+      dbReady = true;
+      console.log('DB ready');
+    })
     .catch((err) => {
       console.warn(`DB init attempt ${attempt}/${MAX_DB_RETRIES} failed:`, err.message);
-      if (attempt >= MAX_DB_RETRIES) throw err;
+      if (attempt >= MAX_DB_RETRIES) {
+        console.error('DB init failed after retries:', err);
+        return;
+      }
       return new Promise((resolve) => setTimeout(resolve, RETRY_MS)).then(() =>
         tryDbInit(attempt + 1)
       );
     });
 }
 
-tryDbInit()
-  .then(() => {
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Joke service listening on ${PORT}`);
-    });
-  })
-  .catch((err) => {
-    console.error('DB init failed after retries:', err);
-    process.exit(1);
-  });
+tryDbInit();
