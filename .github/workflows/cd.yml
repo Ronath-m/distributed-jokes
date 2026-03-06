@@ -1,0 +1,75 @@
+name: cd-azure
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push moderate image
+        run: |
+          IMAGE_PREFIX=ghcr.io/${{ github.repository_owner }}/distributed-jokes
+          docker build -t $IMAGE_PREFIX-moderate:latest services/moderate
+          docker push $IMAGE_PREFIX-moderate:latest
+
+      # (Optional) build and push other service images here (joke, submit, etl)
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Trigger redeploy on app VMs
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            # Joke VM: pull latest repo and rebuild/restart stack
+            az vm run-command invoke \
+              -g jokes-rg \
+              -n jokes-joke-vm \
+              --command-id RunShellScript \
+              --scripts "
+            cd /home/azureuser/app && git pull
+            cd /home/azureuser/app/deploy/joke
+            RABBITMQ_IP=10.0.1.5 docker compose up -d --build
+            "
+
+            # Moderate VM
+            az vm run-command invoke \
+              -g jokes-rg \
+              -n jokes-moderate-vm \
+              --command-id RunShellScript \
+              --scripts "
+            cd /home/azureuser/app && git pull || true
+            cd /home/azureuser/app/deploy/moderate
+            JOKE_IP=10.1.1.4 RABBITMQ_IP=10.0.1.5 docker compose up -d --build
+            "
+
+            # Submit VM
+            az vm run-command invoke \
+              -g jokes-rg \
+              -n jokes-submit-vm \
+              --command-id RunShellScript \
+              --scripts "
+            cd /home/azureuser/app && git pull || true
+            cd /home/azureuser/app/deploy/submit
+            JOKE_IP=10.1.1.4 RABBITMQ_IP=10.0.1.5 docker compose up -d --build
+            "
+
