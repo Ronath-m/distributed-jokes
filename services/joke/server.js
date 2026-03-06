@@ -14,6 +14,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+// Health check for Kong / load balancers
+app.get('/health', (req, res) => {
+  res.status(200).type('text/plain').send('ok');
+});
 // Serve static UI (explicit root so proxy gets a clean response)
 app.get('/', (req, res) => {
   res.type('text/html');
@@ -45,15 +49,30 @@ app.get('/types', async (req, res) => {
   }
 });
 
-// Start only after DB schema and seed are ready (adapter chosen by DB_TYPE)
-initSchema()
-  .then(() => seedIfEmpty())
+// Retry DB init so we survive MySQL not ready at first boot (e.g. on Azure VM)
+const MAX_DB_RETRIES = 30;
+const RETRY_MS = 2000;
+
+function tryDbInit(attempt = 1) {
+  return initSchema()
+    .then(() => seedIfEmpty())
+    .then(() => true)
+    .catch((err) => {
+      console.warn(`DB init attempt ${attempt}/${MAX_DB_RETRIES} failed:`, err.message);
+      if (attempt >= MAX_DB_RETRIES) throw err;
+      return new Promise((resolve) => setTimeout(resolve, RETRY_MS)).then(() =>
+        tryDbInit(attempt + 1)
+      );
+    });
+}
+
+tryDbInit()
   .then(() => {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Joke service listening on ${PORT}`);
     });
   })
   .catch((err) => {
-    console.error('DB init failed:', err);
+    console.error('DB init failed after retries:', err);
     process.exit(1);
   });
