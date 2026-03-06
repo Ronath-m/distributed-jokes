@@ -9,11 +9,6 @@ services:
       MYSQL_PASSWORD: jokepass
     volumes:
       - mysql_vol:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
     restart: unless-stopped
 
   joke:
@@ -30,8 +25,7 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      mysql:
-        condition: service_healthy
+      - mysql
     restart: unless-stopped
 
   etl:
@@ -49,8 +43,7 @@ services:
       MODERATED_QUEUE: moderated
       TYPE_UPDATE_EXCHANGE: type_update
     depends_on:
-      mysql:
-        condition: service_healthy
+      - mysql
     restart: unless-stopped
 
 volumes:
