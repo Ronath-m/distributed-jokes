@@ -64,7 +64,7 @@ app.listen(PORT, '0.0.0.0', () => {
 });
 
 // Retry DB init in background so we survive MySQL not ready at first boot (e.g. on Azure VM)
-const MAX_DB_RETRIES = 30;
+// Keep retrying indefinitely – DB might come up late on a slow VM.
 const RETRY_MS = 2000;
 
 function tryDbInit(attempt = 1) {
@@ -75,11 +75,7 @@ function tryDbInit(attempt = 1) {
       console.log('DB ready');
     })
     .catch((err) => {
-      console.warn(`DB init attempt ${attempt}/${MAX_DB_RETRIES} failed:`, err.message);
-      if (attempt >= MAX_DB_RETRIES) {
-        console.error('DB init failed after retries:', err);
-        return;
-      }
+      console.warn(`DB init attempt ${attempt} failed:`, err.message);
       return new Promise((resolve) => setTimeout(resolve, RETRY_MS)).then(() =>
         tryDbInit(attempt + 1)
       );
