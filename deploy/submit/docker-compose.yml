@@ -1,0 +1,21 @@
+# Submit VM. JOKE_IP and RABBITMQ_IP set by Terraform env.
+services:
+  submit:
+    build: ../../services/submit
+    image: distributed-jokes-submit:latest
+    environment:
+      PORT: 3200
+      JOKE_SERVICE_URL: http://${JOKE_IP}:3000
+      RABBITMQ_URL: amqp://guest:guest@${RABBITMQ_IP}:5672
+      SUBMIT_QUEUE: submit
+      TYPES_CACHE_PATH: /data/types.json
+      TYPE_UPDATE_EXCHANGE: type_update
+      SUB_TYPE_UPDATE_QUEUE: sub_type_update
+    ports:
+      - "3200:3200"
+    volumes:
+      - submit_vol:/data
+    restart: unless-stopped
+
+volumes:
+  submit_vol:

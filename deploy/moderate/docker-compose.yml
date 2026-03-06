@@ -1,0 +1,22 @@
+# Moderate VM. JOKE_IP and RABBITMQ_IP set by Terraform env.
+services:
+  moderate:
+    build: ../../services/moderate
+    image: distributed-jokes-moderate:latest
+    environment:
+      PORT: 3100
+      JOKE_SERVICE_URL: http://${JOKE_IP}:3000
+      RABBITMQ_URL: amqp://guest:guest@${RABBITMQ_IP}:5672
+      SUBMIT_QUEUE: submit
+      MODERATED_QUEUE: moderated
+      TYPES_CACHE_PATH: /data/types.json
+      TYPE_UPDATE_EXCHANGE: type_update
+      MOD_TYPE_UPDATE_QUEUE: mod_type_update
+    ports:
+      - "3100:3100"
+    volumes:
+      - moderate_vol:/data
+    restart: unless-stopped
+
+volumes:
+  moderate_vol:

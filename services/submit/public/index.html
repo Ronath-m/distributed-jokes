@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Submit a Joke</title>
+  <base id="base" href="/">
+  <script>document.getElementById('base').href = (document.location.pathname.replace(/\/?$/, '/') || '/');</script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Submit a Joke</h1>
+    <form id="form">
+      <label for="setup">Setup</label>
+      <textarea id="setup" required rows="2"></textarea>
+      <label for="punchline">Punchline</label>
+      <textarea id="punchline" required rows="2"></textarea>
+      <label for="typeSelect">Type (select or add new)</label>
+      <div class="type-row">
+        <select id="typeSelect"></select>
+        <input type="text" id="typeNew" placeholder="Or enter new type" />
+      </div>
+      <button type="submit" id="submitBtn">Submit</button>
+    </form>
+    <p id="message"></p>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

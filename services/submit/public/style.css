@@ -1,0 +1,12 @@
+* { box-sizing: border-box; }
+body { font-family: system-ui, sans-serif; max-width: 560px; margin: 2rem auto; padding: 0 1rem; }
+.container { background: #f8f9fa; padding: 1.5rem; border-radius: 8px; }
+h1 { margin-top: 0; }
+label { display: block; margin: 0.75rem 0 0.25rem; }
+textarea, select, input[type="text"] { width: 100%; padding: 0.5rem; margin-bottom: 0.5rem; }
+.type-row { display: flex; gap: 0.5rem; }
+.type-row select { flex: 0 0 140px; }
+.type-row input { flex: 1; }
+button { margin-top: 1rem; padding: 0.5rem 1rem; cursor: pointer; }
+#message { margin-top: 1rem; min-height: 1.5rem; color: #0a0; }
+#message.error { color: #c00; }

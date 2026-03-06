@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Moderate Jokes</title>
+  <base id="base" href="/">
+  <script>document.getElementById('base').href = (document.location.pathname.replace(/\/?$/, '/') || '/');</script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Moderate Jokes</h1>
+    <div id="noJoke" class="hidden">
+      <p>No jokes in queue. Checking again in 1s…</p>
+    </div>
+    <div id="form" class="hidden">
+      <label for="setup">Setup</label>
+      <textarea id="setup" rows="2"></textarea>
+      <label for="punchline">Punchline</label>
+      <textarea id="punchline" rows="2"></textarea>
+      <label for="typeSelect">Type</label>
+      <div class="row">
+        <select id="typeSelect"></select>
+        <input type="text" id="typeNew" placeholder="Or new type" />
+      </div>
+      <div class="actions">
+        <button type="button" id="submitBtn">Submit to site</button>
+        <button type="button" id="nextBtn">Skip (next)</button>
+      </div>
+    </div>
+    <p id="message"></p>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

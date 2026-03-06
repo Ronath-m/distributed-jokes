@@ -1,0 +1,193 @@
+# Phase 3 + 5: Kong, static IPs. Phase 5: dual DB – set DB_TYPE=mongo and MONGO_URI to use MongoDB.
+# Default: MySQL. Switch: DB_TYPE=mongo, MONGO_URI=mongodb://172.28.0.12:27017/jokedb
+
+services:
+  kong:
+    image: kong:3.4
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/kong.yml
+      KONG_PROXY_LISTEN: "0.0.0.0:8000"
+      KONG_ADMIN_LISTEN: "0.0.0.0:8444"
+    ports:
+      - "80:8000"
+      - "8443:8443"
+    volumes:
+      - ./gateway:/kong:ro
+    networks:
+      app_network:
+        ipv4_address: 172.28.0.2
+    depends_on:
+      joke:
+        condition: service_started
+      submit:
+        condition: service_started
+      moderate:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: on-failure
+
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: jokedb
+      MYSQL_USER: jokeuser
+      MYSQL_PASSWORD: jokepass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_vol:/var/lib/mysql
+    networks:
+      app_network:
+        ipv4_address: 172.28.0.10
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_vol:/data/db
+    networks:
+      app_network:
+        ipv4_address: 172.28.0.12
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_vol:/var/lib/rabbitmq
+    networks:
+      app_network:
+        ipv4_address: 172.28.0.11
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  joke:
+    build: ./services/joke
+    environment:
+      PORT: 3000
+      DB_TYPE: ${DB_TYPE:-mysql}
+      DB_HOST: 172.28.0.10
+      DB_PORT: 3306
+      DB_USER: jokeuser
+      DB_PASSWORD: jokepass
+      DB_NAME: jokedb
+      MONGO_URI: ${MONGO_URI:-mongodb://172.28.0.12:27017/jokedb}
+    ports:
+      - "4000:3000"
+    networks:
+      app_network:
+        ipv4_address: 172.28.0.20
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+
+  etl:
+    build: ./services/etl
+    environment:
+      PORT: 3001
+      DB_TYPE: ${DB_TYPE:-mysql}
+      DB_HOST: 172.28.0.10
+      DB_PORT: 3306
+      DB_USER: jokeuser
+      DB_PASSWORD: jokepass
+      DB_NAME: jokedb
+      MONGO_URI: ${MONGO_URI:-mongodb://172.28.0.12:27017/jokedb}
+      RABBITMQ_URL: amqp://guest:guest@172.28.0.11:5672
+      MODERATED_QUEUE: moderated
+      TYPE_UPDATE_EXCHANGE: type_update
+    ports:
+      - "4001:3001"
+    networks:
+      app_network:
+        ipv4_address: 172.28.0.21
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  moderate:
+    build: ./services/moderate
+    environment:
+      PORT: 3100
+      JOKE_SERVICE_URL: http://172.28.0.20:3000
+      RABBITMQ_URL: amqp://guest:guest@172.28.0.11:5672
+      SUBMIT_QUEUE: submit
+      MODERATED_QUEUE: moderated
+      TYPES_CACHE_PATH: /data/types.json
+      TYPE_UPDATE_EXCHANGE: type_update
+      MOD_TYPE_UPDATE_QUEUE: mod_type_update
+    ports:
+      - "4100:3100"
+    volumes:
+      - moderate_types_vol:/data
+    networks:
+      app_network:
+        ipv4_address: 172.28.0.23
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      joke:
+        condition: service_started
+
+  submit:
+    build: ./services/submit
+    environment:
+      PORT: 3200
+      JOKE_SERVICE_URL: http://172.28.0.20:3000
+      RABBITMQ_URL: amqp://guest:guest@172.28.0.11:5672
+      SUBMIT_QUEUE: submit
+      TYPES_CACHE_PATH: /data/types.json
+      TYPE_UPDATE_EXCHANGE: type_update
+      SUB_TYPE_UPDATE_QUEUE: sub_type_update
+    ports:
+      - "4200:3200"
+    volumes:
+      - submit_types_vol:/data
+    networks:
+      app_network:
+        ipv4_address: 172.28.0.22
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+networks:
+  app_network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/24
+          gateway: 172.28.0.1
+
+volumes:
+  mysql_vol:
+  mongo_vol:
+  rabbitmq_vol:
+  submit_types_vol:
+  moderate_types_vol:

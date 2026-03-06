@@ -1,0 +1,12 @@
+{
+  "name": "moderate-service",
+  "version": "1.0.0",
+  "description": "Moderator microservice – Option 4: consume submit queue, POST moderated, type_update cache",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "amqplib": "^0.10.3",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2"
+  }
+}

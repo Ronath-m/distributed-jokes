@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Joke Service</title>
+  <base id="base" href="/">
+  <script>document.getElementById('base').href = (document.location.pathname.replace(/\/?$/, '/') || '/');</script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Random Joke</h1>
+    <label for="type">Joke type:</label>
+    <select id="type"></select>
+    <button id="getJoke">Get a joke</button>
+    <div id="result">
+      <p id="setup"></p>
+      <p id="punchline" class="hidden"></p>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

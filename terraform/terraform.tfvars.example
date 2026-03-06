@@ -1,0 +1,12 @@
+# Copy to terraform.tfvars and set subscription_id. Do not commit tfvars.
+
+subscription_id = "2961af5c-d1f2-45a5-8ca8-5eb62c22abd4"
+
+# Optional overrides (defaults suit student subscription: 3 regions, Standard_B2ats_v2)
+# prefix         = "jokes"
+# admin_username = "azureuser"
+# admin_ssh_public_key_path = "~/.ssh/id_rsa.pub"
+# vm_size        = "Standard_B2ats_v2"
+# region_gateway = "southeastasia"
+# region_joke    = "centralindia"
+# region_apps    = "eastasia"
