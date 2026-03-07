@@ -58,5 +58,6 @@ jobs:
           wait
           moderate=$(cat /tmp/moderate.exit); submit=$(cat /tmp/submit.exit); joke=$(cat /tmp/joke.exit)
           echo "Exit codes: joke=$joke moderate=$moderate submit=$submit (124 = timeout)"
-          exit $(( joke | moderate | submit ))
+          # Fail only if moderate or submit failed; joke VM is best-effort (often Conflict if previous run stuck).
+          exit $(( moderate | submit ))
 
