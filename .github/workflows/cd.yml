@@ -38,28 +38,25 @@ jobs:
             az account set --subscription "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
           fi
 
-      - name: Trigger redeploy on app VMs (parallel, retry on Conflict)
+      - name: Trigger redeploy on app VMs (15 min timeout per VM)
         run: |
           set +e
-          run_vm() {
-            local label=$1 vm=$2 script=$3
-            for attempt in 1 2 3; do
-              echo "=== $label (attempt $attempt) ==="
-              if az vm run-command invoke -g jokes-rg -n "$vm" --command-id RunShellScript --scripts "$script"; then
-                return 0
-              fi
-              [ $attempt -lt 3 ] && echo "Waiting 2 min before retry (e.g. run command was in progress)..." && sleep 120
-            done
-            return 1
+          # 15 min timeout per VM so we never hang (az run-command can take 90 min otherwise).
+          TIMEOUT=900
+          run_one() {
+            local label=$1 vm=$2 script=$3 out=$4
+            echo "=== $label ==="
+            timeout $TIMEOUT az vm run-command invoke -g jokes-rg -n "$vm" --command-id RunShellScript --scripts "$script"
+            echo $? > "$out"
           }
-          JOKE_SCRIPT='cd /home/azureuser/app && git pull && cd /home/azureuser/app/deploy/joke && RABBITMQ_IP=10.0.1.5 docker compose up -d --build'
           MOD_SCRIPT='cd /home/azureuser/app && git pull || true && cd /home/azureuser/app/deploy/moderate && JOKE_IP=10.1.1.4 RABBITMQ_IP=10.0.1.5 docker compose up -d --build'
           SUB_SCRIPT='cd /home/azureuser/app && git pull || true && cd /home/azureuser/app/deploy/submit && JOKE_IP=10.1.1.4 RABBITMQ_IP=10.0.1.5 docker compose up -d --build'
-          (run_vm "Joke VM" "jokes-joke-vm" "$JOKE_SCRIPT"; echo $? > /tmp/joke.exit) &
-          (run_vm "Moderate VM" "jokes-moderate-vm" "$MOD_SCRIPT"; echo $? > /tmp/moderate.exit) &
-          (run_vm "Submit VM" "jokes-submit-vm" "$SUB_SCRIPT"; echo $? > /tmp/submit.exit) &
+          JOKE_SCRIPT='cd /home/azureuser/app && git pull && cd /home/azureuser/app/deploy/joke && RABBITMQ_IP=10.0.1.5 docker compose up -d --build'
+          (run_one "Moderate VM" "jokes-moderate-vm" "$MOD_SCRIPT" /tmp/moderate.exit) &
+          (run_one "Submit VM" "jokes-submit-vm" "$SUB_SCRIPT" /tmp/submit.exit) &
+          (run_one "Joke VM" "jokes-joke-vm" "$JOKE_SCRIPT" /tmp/joke.exit) &
           wait
-          joke=$(cat /tmp/joke.exit); moderate=$(cat /tmp/moderate.exit); submit=$(cat /tmp/submit.exit)
-          echo "Exit codes: joke=$joke moderate=$moderate submit=$submit"
+          moderate=$(cat /tmp/moderate.exit); submit=$(cat /tmp/submit.exit); joke=$(cat /tmp/joke.exit)
+          echo "Exit codes: joke=$joke moderate=$moderate submit=$submit (124 = timeout)"
           exit $(( joke | moderate | submit ))
 
