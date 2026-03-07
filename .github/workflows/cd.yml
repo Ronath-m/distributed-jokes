@@ -38,12 +38,28 @@ jobs:
             az account set --subscription "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
           fi
 
-      - name: Trigger redeploy on app VMs
+      - name: Trigger redeploy on app VMs (parallel, retry on Conflict)
         run: |
-          # Joke VM
-          az vm run-command invoke -g jokes-rg -n jokes-joke-vm --command-id RunShellScript --scripts 'cd /home/azureuser/app && git pull && cd /home/azureuser/app/deploy/joke && RABBITMQ_IP=10.0.1.5 docker compose up -d --build'
-          # Moderate VM
-          az vm run-command invoke -g jokes-rg -n jokes-moderate-vm --command-id RunShellScript --scripts 'cd /home/azureuser/app && git pull || true && cd /home/azureuser/app/deploy/moderate && JOKE_IP=10.1.1.4 RABBITMQ_IP=10.0.1.5 docker compose up -d --build'
-          # Submit VM
-          az vm run-command invoke -g jokes-rg -n jokes-submit-vm --command-id RunShellScript --scripts 'cd /home/azureuser/app && git pull || true && cd /home/azureuser/app/deploy/submit && JOKE_IP=10.1.1.4 RABBITMQ_IP=10.0.1.5 docker compose up -d --build'
+          set +e
+          run_vm() {
+            local label=$1 vm=$2 script=$3
+            for attempt in 1 2 3; do
+              echo "=== $label (attempt $attempt) ==="
+              if az vm run-command invoke -g jokes-rg -n "$vm" --command-id RunShellScript --scripts "$script"; then
+                return 0
+              fi
+              [ $attempt -lt 3 ] && echo "Waiting 2 min before retry (e.g. run command was in progress)..." && sleep 120
+            done
+            return 1
+          }
+          JOKE_SCRIPT='cd /home/azureuser/app && git pull && cd /home/azureuser/app/deploy/joke && RABBITMQ_IP=10.0.1.5 docker compose up -d --build'
+          MOD_SCRIPT='cd /home/azureuser/app && git pull || true && cd /home/azureuser/app/deploy/moderate && JOKE_IP=10.1.1.4 RABBITMQ_IP=10.0.1.5 docker compose up -d --build'
+          SUB_SCRIPT='cd /home/azureuser/app && git pull || true && cd /home/azureuser/app/deploy/submit && JOKE_IP=10.1.1.4 RABBITMQ_IP=10.0.1.5 docker compose up -d --build'
+          (run_vm "Joke VM" "jokes-joke-vm" "$JOKE_SCRIPT"; echo $? > /tmp/joke.exit) &
+          (run_vm "Moderate VM" "jokes-moderate-vm" "$MOD_SCRIPT"; echo $? > /tmp/moderate.exit) &
+          (run_vm "Submit VM" "jokes-submit-vm" "$SUB_SCRIPT"; echo $? > /tmp/submit.exit) &
+          wait
+          joke=$(cat /tmp/joke.exit); moderate=$(cat /tmp/moderate.exit); submit=$(cat /tmp/submit.exit)
+          echo "Exit codes: joke=$joke moderate=$moderate submit=$submit"
+          exit $(( joke | moderate | submit ))
 
