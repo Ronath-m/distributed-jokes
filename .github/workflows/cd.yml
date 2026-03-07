@@ -27,7 +27,7 @@ jobs:
 
       - name: Build and push moderate image
         run: |
-          IMAGE_PREFIX=ghcr.io/${{ github.repository_owner }}/distributed-jokes
+          IMAGE_PREFIX=ghcr.io/$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')/distributed-jokes
           docker build -t $IMAGE_PREFIX-moderate:latest services/moderate
           docker push $IMAGE_PREFIX-moderate:latest
 
