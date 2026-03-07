@@ -70,6 +70,43 @@ Outputs: Kong VM private IP, VNet ID. Add more VMs by copying the `kong_vm` bloc
    curl -s http://localhost:3000/health
    ```
 
+## CD (GitHub Actions) without Azure app registration
+
+CD runs on a **self-hosted runner** on the submit VM, using the VM’s **Managed Identity** so you don’t need Entra ID or `AZURE_CREDENTIALS`.
+
+1. **Apply Terraform** so the submit VM exists (identity block is in Terraform, but the RBAC grant is done manually once):
+   ```bash
+   cd terraform && terraform apply
+   ```
+
+2. **One-time: enable identity + grant Contributor (from your laptop)**  
+   Run once after Terraform has created the submit VM:
+   ```bash
+   SUB_ID="2961af5c-d1f2-45a5-8ca8-5eb62c22abd4"
+   RG="jokes-rg"
+   VM="jokes-submit-vm"
+
+   # Enable system-assigned managed identity on the submit VM
+   az vm identity assign -g "$RG" -n "$VM"
+
+   # Get the managed identity's principalId
+   PRINCIPAL_ID=$(az vm show -g "$RG" -n "$VM" --query "identity.principalId" -o tsv)
+
+   # Grant Contributor on the resource group to that identity
+   az role assignment create \
+     --assignee-object-id "$PRINCIPAL_ID" \
+     --assignee-principal-type ServicePrincipal \
+     --role Contributor \
+     --scope "/subscriptions/$SUB_ID/resourceGroups/$RG"
+   ```
+
+3. **One-time: install the runner on the submit VM**  
+   SSH into the submit VM (e.g. via Bastion or a jump host), then follow **[docs/SELF_HOSTED_RUNNER_SETUP.md](docs/SELF_HOSTED_RUNNER_SETUP.md)** to install the GitHub Actions runner with label `azure` and (optional) Azure CLI for `az login --identity`.
+
+4. **Optional:** In the repo’s GitHub **Settings → Secrets and variables → Actions**, add `AZURE_SUBSCRIPTION_ID` with your subscription ID if you have multiple subscriptions.
+
+After that, pushes to `main` trigger the workflow on the self-hosted runner; it builds/pushes the moderate image and runs `az vm run-command` on the app VMs using the VM’s managed identity.
+
 ## Requirements
 
 - Node 18+

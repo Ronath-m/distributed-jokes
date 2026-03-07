@@ -178,6 +178,36 @@ resource "azurerm_public_ip" "kong_pip" {
   sku                 = "Standard"
 }
 
+# --- Public IP for submit VM (so you can SSH from your Mac for runner setup)
+resource "azurerm_public_ip" "submit_pip" {
+  name                = "${var.prefix}-submit-pip"
+  location            = var.region_apps
+  resource_group_name = azurerm_resource_group.rg.name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+}
+
+# --- NSG for submit VM: allow SSH so you can connect from your Mac
+resource "azurerm_network_security_group" "submit" {
+  name                = "${var.prefix}-submit-nsg"
+  location            = var.region_apps
+  resource_group_name = azurerm_resource_group.rg.name
+}
+
+resource "azurerm_network_security_rule" "submit_allow_ssh" {
+  name                        = "allow-ssh"
+  priority                    = 100
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "22"
+  source_address_prefix       = "0.0.0.0/0"
+  destination_address_prefix  = "*"
+  resource_group_name         = azurerm_resource_group.rg.name
+  network_security_group_name = azurerm_network_security_group.submit.name
+}
+
 # --- NICs and VMs
 # Kong: 10.0.1.4 + public IP
 resource "azurerm_network_interface" "kong_nic" {
@@ -236,7 +266,7 @@ resource "azurerm_network_interface" "moderate_nic" {
   }
 }
 
-# Submit: 10.2.1.5
+# Submit: 10.2.1.5 + public IP (for SSH from your Mac to install runner)
 resource "azurerm_network_interface" "submit_nic" {
   name                = "${var.prefix}-submit-nic"
   location            = var.region_apps
@@ -247,7 +277,13 @@ resource "azurerm_network_interface" "submit_nic" {
     subnet_id                     = azurerm_subnet.subnet_apps.id
     private_ip_address_allocation = "Static"
     private_ip_address            = "10.2.1.5"
+    public_ip_address_id          = azurerm_public_ip.submit_pip.id
   }
+}
+
+resource "azurerm_network_interface_security_group_association" "submit" {
+  network_interface_id      = azurerm_network_interface.submit_nic.id
+  network_security_group_id = azurerm_network_security_group.submit.id
 }
 
 # VM common settings
@@ -375,6 +411,13 @@ resource "azurerm_linux_virtual_machine" "submit" {
   size                  = local.vm_common.size
   admin_username        = local.vm_common.admin_username
   network_interface_ids = [azurerm_network_interface.submit_nic.id]
+
+  # NOTE: We enable the system-assigned managed identity and grant it Contributor on the
+  # resource group with a one-time `az` CLI command (see README). Terraform does not
+  # manage the role assignment to avoid provider bugs around principal_id resolution.
+  identity {
+    type = "SystemAssigned"
+  }
 
   admin_ssh_key {
     username   = local.vm_common.admin_username

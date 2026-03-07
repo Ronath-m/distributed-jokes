@@ -7,6 +7,11 @@ output "kong_public_ip" {
   description = "Use this URL for the API gateway (e.g. http://<this-ip>)"
 }
 
+output "submit_public_ip" {
+  value       = azurerm_public_ip.submit_pip.ip_address
+  description = "SSH to submit VM from your Mac: ssh azureuser@<this-ip>"
+}
+
 output "private_ips" {
   value = {
     kong     = azurerm_network_interface.kong_nic.private_ip_address
