@@ -38,26 +38,23 @@ jobs:
             az account set --subscription "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
           fi
 
-      - name: Trigger redeploy on app VMs (15 min timeout per VM)
+      - name: Trigger redeploy on app VMs
         run: |
           set +e
-          # 15 min timeout per VM so we never hang (az run-command can take 90 min otherwise).
-          TIMEOUT=900
           run_one() {
-            local label=$1 vm=$2 script=$3 out=$4
-            echo "=== $label ==="
-            timeout $TIMEOUT az vm run-command invoke -g jokes-rg -n "$vm" --command-id RunShellScript --scripts "$script"
+            local label=$1 vm=$2 script=$3 out=$4 t=${5:-900}
+            echo "=== $label (timeout ${t}s) ==="
+            timeout $t az vm run-command invoke -g jokes-rg -n "$vm" --command-id RunShellScript --scripts "$script"
             echo $? > "$out"
           }
           MOD_SCRIPT='cd /home/azureuser/app && git pull || true && cd /home/azureuser/app/deploy/moderate && JOKE_IP=10.1.1.4 RABBITMQ_IP=10.0.1.5 docker compose up -d --build'
           SUB_SCRIPT='cd /home/azureuser/app && git pull || true && cd /home/azureuser/app/deploy/submit && JOKE_IP=10.1.1.4 RABBITMQ_IP=10.0.1.5 docker compose up -d --build'
           JOKE_SCRIPT='cd /home/azureuser/app && git pull && cd /home/azureuser/app/deploy/joke && RABBITMQ_IP=10.0.1.5 docker compose up -d --build'
-          (run_one "Moderate VM" "jokes-moderate-vm" "$MOD_SCRIPT" /tmp/moderate.exit) &
-          (run_one "Submit VM" "jokes-submit-vm" "$SUB_SCRIPT" /tmp/submit.exit) &
-          (run_one "Joke VM" "jokes-joke-vm" "$JOKE_SCRIPT" /tmp/joke.exit) &
+          (run_one "Moderate VM" "jokes-moderate-vm" "$MOD_SCRIPT" /tmp/moderate.exit 900) &
+          (run_one "Submit VM" "jokes-submit-vm" "$SUB_SCRIPT" /tmp/submit.exit 900) &
+          (run_one "Joke VM" "jokes-joke-vm" "$JOKE_SCRIPT" /tmp/joke.exit 2400) &
           wait
           moderate=$(cat /tmp/moderate.exit); submit=$(cat /tmp/submit.exit); joke=$(cat /tmp/joke.exit)
           echo "Exit codes: joke=$joke moderate=$moderate submit=$submit (124 = timeout)"
-          # Fail only if moderate or submit failed; joke VM is best-effort (often Conflict if previous run stuck).
-          exit $(( moderate | submit ))
+          exit $(( joke | moderate | submit ))
 
