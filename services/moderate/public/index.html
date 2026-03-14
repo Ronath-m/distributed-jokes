@@ -3,34 +3,51 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Moderate Jokes</title>
+  <title>Moderate Jokes &mdash; Distributed Jokes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
   <base id="base" href="/">
   <script>document.getElementById('base').href = (document.location.pathname.replace(/\/?$/, '/') || '/');</script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="container">
-    <h1>Moderate Jokes</h1>
-    <div id="noJoke" class="hidden">
-      <p>No jokes in queue. Checking again in 1s…</p>
+  <nav class="site-nav">
+    <a href="/app/joke" class="nav-brand">Distributed Jokes</a>
+    <div class="nav-right">
+      <div class="nav-links">
+        <a href="/app/joke" class="nav-link">Joke</a>
+        <a href="/app/submit" class="nav-link">Submit</a>
+        <a href="/app/moderate" class="nav-link active">Moderate</a>
+      </div>
+      <a id="logoutLink" href="#" class="nav-link logout hidden">Log out</a>
     </div>
-    <div id="form" class="hidden">
-      <label for="setup">Setup</label>
-      <textarea id="setup" rows="2"></textarea>
-      <label for="punchline">Punchline</label>
-      <textarea id="punchline" rows="2"></textarea>
-      <label for="typeSelect">Type</label>
-      <div class="row">
-        <select id="typeSelect"></select>
-        <input type="text" id="typeNew" placeholder="Or new type" />
+  </nav>
+  <main class="page">
+    <header class="page-header">
+      <h1>Moderate Jokes</h1>
+      <p class="page-desc">Review submitted jokes. Approve to publish or skip to the next.</p>
+    </header>
+    <div id="noJoke" class="card card-empty hidden">
+      <p class="empty-text">No jokes in queue. Checking again in a moment…</p>
+    </div>
+    <div id="form" class="card card-main hidden">
+      <label for="setup" class="label">Setup</label>
+      <textarea id="setup" class="input" rows="3"></textarea>
+      <label for="punchline" class="label">Punchline</label>
+      <textarea id="punchline" class="input" rows="3"></textarea>
+      <label for="typeSelect" class="label">Category</label>
+      <div class="type-row">
+        <select id="typeSelect" class="input" aria-label="Category"></select>
+        <input type="text" id="typeNew" class="input" placeholder="Or new category" aria-label="New category">
       </div>
       <div class="actions">
-        <button type="button" id="submitBtn">Submit to site</button>
-        <button type="button" id="nextBtn">Skip (next)</button>
+        <button type="button" id="submitBtn" class="btn btn-primary">Approve &amp; publish</button>
+        <button type="button" id="nextBtn" class="btn btn-secondary">Skip</button>
       </div>
     </div>
-    <p id="message"></p>
-  </div>
+    <p id="message" class="message"></p>
+  </main>
   <script src="app.js"></script>
 </body>
 </html>

@@ -3,28 +3,44 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Submit a Joke</title>
+  <title>Submit a Joke &mdash; Distributed Jokes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
   <base id="base" href="/">
   <script>document.getElementById('base').href = (document.location.pathname.replace(/\/?$/, '/') || '/');</script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="container">
-    <h1>Submit a Joke</h1>
-    <form id="form">
-      <label for="setup">Setup</label>
-      <textarea id="setup" required rows="2"></textarea>
-      <label for="punchline">Punchline</label>
-      <textarea id="punchline" required rows="2"></textarea>
-      <label for="typeSelect">Type (select or add new)</label>
-      <div class="type-row">
-        <select id="typeSelect"></select>
-        <input type="text" id="typeNew" placeholder="Or enter new type" />
-      </div>
-      <button type="submit" id="submitBtn">Submit</button>
-    </form>
-    <p id="message"></p>
-  </div>
+  <nav class="site-nav">
+    <a href="/app/joke" class="nav-brand">Distributed Jokes</a>
+    <div class="nav-links">
+      <a href="/app/joke" class="nav-link">Joke</a>
+      <a href="/app/submit" class="nav-link active">Submit</a>
+      <a href="/app/moderate" class="nav-link">Moderate</a>
+    </div>
+  </nav>
+  <main class="page">
+    <header class="page-header">
+      <h1>Submit a Joke</h1>
+      <p class="page-desc">Add your own joke. It will go to the moderation queue and appear on the site once approved.</p>
+    </header>
+    <section class="card card-main">
+      <form id="form">
+        <label for="setup" class="label">Setup</label>
+        <textarea id="setup" class="input" required rows="3" placeholder="e.g. Why did the chicken cross the road?"></textarea>
+        <label for="punchline" class="label">Punchline</label>
+        <textarea id="punchline" class="input" required rows="3" placeholder="e.g. To get to the other side."></textarea>
+        <label for="typeSelect" class="label">Category</label>
+        <div class="type-row">
+          <select id="typeSelect" class="input" aria-label="Category"></select>
+          <input type="text" id="typeNew" class="input" placeholder="Or enter new category" aria-label="New category">
+        </div>
+        <button type="submit" id="submitBtn" class="btn btn-primary">Submit joke</button>
+      </form>
+      <p id="message" class="message"></p>
+    </section>
+  </main>
   <script src="app.js"></script>
 </body>
 </html>

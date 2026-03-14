@@ -1,17 +1,31 @@
 (function () {
-  const POLL_MS = 1000;
-  const noJokeEl = document.getElementById('noJoke');
-  const formEl = document.getElementById('form');
-  const setupEl = document.getElementById('setup');
-  const punchlineEl = document.getElementById('punchline');
-  const typeSelect = document.getElementById('typeSelect');
-  const typeNew = document.getElementById('typeNew');
-  const submitBtn = document.getElementById('submitBtn');
-  const nextBtn = document.getElementById('nextBtn');
-  const messageEl = document.getElementById('message');
+  var POLL_MS = 1000;
+  var noJokeEl = document.getElementById('noJoke');
+  var formEl = document.getElementById('form');
+  var setupEl = document.getElementById('setup');
+  var punchlineEl = document.getElementById('punchline');
+  var typeSelect = document.getElementById('typeSelect');
+  var typeNew = document.getElementById('typeNew');
+  var submitBtn = document.getElementById('submitBtn');
+  var nextBtn = document.getElementById('nextBtn');
+  var messageEl = document.getElementById('message');
 
   function apiBase() {
     return window.location.origin;
+  }
+
+  function loginPath() {
+    var p = (document.location.pathname || '/').replace(/\/$/, '') || '/';
+    return p === '/' ? '/login' : p + '/login';
+  }
+
+  function ensureAuth(res) {
+    if (res.status === 401) {
+      var returnTo = document.location.pathname || '/';
+      window.location.assign(apiBase() + loginPath() + '?returnTo=' + encodeURIComponent(returnTo));
+      return false;
+    }
+    return true;
   }
 
   function showMessage(msg, isError) {
@@ -21,10 +35,10 @@
 
   async function loadTypes() {
     try {
-      const res = await fetch(apiBase() + '/moderate/types');
-      if (!res.ok) return;
-      const types = await res.json();
-      const opts = (Array.isArray(types) ? types : []).map(function (t) {
+      var res = await fetch(apiBase() + '/moderate/types');
+      if (!ensureAuth(res) || !res.ok) return;
+      var types = await res.json();
+      var opts = (Array.isArray(types) ? types : []).map(function (t) {
         return '<option value="' + t + '">' + t + '</option>';
       }).join('');
       typeSelect.innerHTML = opts;
@@ -34,16 +48,17 @@
   }
 
   function getType() {
-    const v = (typeNew.value || '').trim();
+    var v = (typeNew.value || '').trim();
     if (v) return v;
     return typeSelect.value || '';
   }
 
   async function fetchNext() {
     try {
-      const res = await fetch(apiBase() + '/moderate');
+      var res = await fetch(apiBase() + '/moderate');
+      if (!ensureAuth(res)) return null;
       if (!res.ok) throw new Error(res.status);
-      const data = await res.json();
+      var data = await res.json();
       if (data.noJoke) {
         noJokeEl.classList.remove('hidden');
         formEl.classList.add('hidden');
@@ -71,22 +86,23 @@
   }
 
   submitBtn.addEventListener('click', async function () {
-    const setup = (setupEl.value || '').trim();
-    const punchline = (punchlineEl.value || '').trim();
-    const type = getType();
+    var setup = (setupEl.value || '').trim();
+    var punchline = (punchlineEl.value || '').trim();
+    var type = getType();
     if (!setup || !punchline || !type) {
-      showMessage('Fill setup, punchline and type.', true);
+      showMessage('Fill setup, punchline and category.', true);
       return;
     }
     showMessage('');
     try {
-      const res = await fetch(apiBase() + '/moderated', {
+      var res = await fetch(apiBase() + '/moderated', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ setup, punchline, type })
+        body: JSON.stringify({ setup: setup, punchline: punchline, type: type })
       });
+      if (!ensureAuth(res)) return;
       if (!res.ok) throw new Error((await res.json().catch(function () { return {}; })).error || res.status);
-      showMessage('Submitted. Loading next…');
+      showMessage('Published. Loading next…');
       formEl.classList.add('hidden');
       noJokeEl.classList.remove('hidden');
       setTimeout(fetchNext, 300);
@@ -101,6 +117,19 @@
     noJokeEl.classList.remove('hidden');
     await fetchNext();
   });
+
+  var logoutEl = document.getElementById('logoutLink');
+  if (logoutEl) {
+    fetch(apiBase() + '/moderate/auth/status', { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : {}; })
+      .then(function (d) {
+        if (d && d.oidc) {
+          var p = (document.location.pathname || '/').replace(/\/$/, '') || '/';
+          logoutEl.href = apiBase() + (p === '/' ? '/logout' : p + '/logout');
+          logoutEl.classList.remove('hidden');
+        }
+      });
+  }
 
   loadTypes();
   fetchNext().then(function () { startPolling(); });

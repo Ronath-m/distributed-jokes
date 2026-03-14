@@ -1,36 +1,23 @@
-# Phase 3 + 5: Kong, static IPs. Phase 5: dual DB – set DB_TYPE=mongo and MONGO_URI to use MongoDB.
-# Default: MySQL. Switch: DB_TYPE=mongo, MONGO_URI=mongodb://172.28.0.12:27017/jokedb
+# Local full stack (Phase 3–7). Single origin via Kong: http://localhost
+# Run from project root: docker compose up -d
+# UIs: http://localhost/app/joke, http://localhost/app/submit, http://localhost/app/moderate
+# Default DB: MySQL. Optional OIDC: set OIDC_* in .env and use moderator at http://localhost:4100 (see docs/OIDC_SETUP.md).
+
+networks:
+  app_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+
+volumes:
+  mysql_vol:
+  mongo_vol:
+  rabbitmq_vol:
+  submit_vol:
+  moderate_vol:
 
 services:
-  kong:
-    image: kong:3.4
-    environment:
-      KONG_DATABASE: "off"
-      KONG_DECLARATIVE_CONFIG: /kong/kong.yml
-      KONG_PROXY_LISTEN: "0.0.0.0:8000"
-      KONG_ADMIN_LISTEN: "0.0.0.0:8444"
-    ports:
-      - "80:8000"
-      - "8443:8443"
-    volumes:
-      - ./gateway:/kong:ro
-    networks:
-      app_network:
-        ipv4_address: 172.28.0.2
-    depends_on:
-      joke:
-        condition: service_started
-      submit:
-        condition: service_started
-      moderate:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "kong", "health"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: on-failure
-
   mysql:
     image: mysql:8
     environment:
@@ -38,8 +25,6 @@ services:
       MYSQL_DATABASE: jokedb
       MYSQL_USER: jokeuser
       MYSQL_PASSWORD: jokepass
-    ports:
-      - "3306:3306"
     volumes:
       - mysql_vol:/var/lib/mysql
     networks:
@@ -53,8 +38,6 @@ services:
 
   mongo:
     image: mongo:7
-    ports:
-      - "27017:27017"
     volumes:
       - mongo_vol:/data/db
     networks:
@@ -99,10 +82,8 @@ services:
       app_network:
         ipv4_address: 172.28.0.20
     depends_on:
-      mysql:
-        condition: service_healthy
-      mongo:
-        condition: service_healthy
+      mysql: { condition: service_healthy }
+      mongo: { condition: service_healthy }
 
   etl:
     build: ./services/etl
@@ -118,42 +99,12 @@ services:
       RABBITMQ_URL: amqp://guest:guest@172.28.0.11:5672
       MODERATED_QUEUE: moderated
       TYPE_UPDATE_EXCHANGE: type_update
-    ports:
-      - "4001:3001"
     networks:
-      app_network:
-        ipv4_address: 172.28.0.21
+      app_network: {}
     depends_on:
-      mysql:
-        condition: service_healthy
-      mongo:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-
-  moderate:
-    build: ./services/moderate
-    environment:
-      PORT: 3100
-      JOKE_SERVICE_URL: http://172.28.0.20:3000
-      RABBITMQ_URL: amqp://guest:guest@172.28.0.11:5672
-      SUBMIT_QUEUE: submit
-      MODERATED_QUEUE: moderated
-      TYPES_CACHE_PATH: /data/types.json
-      TYPE_UPDATE_EXCHANGE: type_update
-      MOD_TYPE_UPDATE_QUEUE: mod_type_update
-    ports:
-      - "4100:3100"
-    volumes:
-      - moderate_types_vol:/data
-    networks:
-      app_network:
-        ipv4_address: 172.28.0.23
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-      joke:
-        condition: service_started
+      mysql: { condition: service_healthy }
+      mongo: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
 
   submit:
     build: ./services/submit
@@ -168,26 +119,73 @@ services:
     ports:
       - "4200:3200"
     volumes:
-      - submit_types_vol:/data
+      - submit_vol:/data
     networks:
       app_network:
         ipv4_address: 172.28.0.22
     depends_on:
-      rabbitmq:
-        condition: service_healthy
+      rabbitmq: { condition: service_healthy }
 
-networks:
-  app_network:
-    driver: bridge
-    ipam:
-      driver: default
-      config:
-        - subnet: 172.28.0.0/24
-          gateway: 172.28.0.1
+  moderate:
+    build: ./services/moderate
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      # So the container can reach Keycloak at localhost:8080 (issuer URL used in redirects so browser works)
+      - "localhost:host-gateway"
+    environment:
+      PORT: 3100
+      JOKE_SERVICE_URL: http://172.28.0.20:3000
+      RABBITMQ_URL: amqp://guest:guest@172.28.0.11:5672
+      SUBMIT_QUEUE: submit
+      MODERATED_QUEUE: moderated
+      TYPES_CACHE_PATH: /data/types.json
+      TYPE_UPDATE_EXCHANGE: type_update
+      MOD_TYPE_UPDATE_QUEUE: mod_type_update
+      # Optional OIDC (Phase 7). Set in .env to enable; then run with: docker compose --profile oidc up -d
+      OIDC_ISSUER_BASE_URL: ${OIDC_ISSUER_BASE_URL:-}
+      OIDC_ISSUER_INTERNAL_URL: ${OIDC_ISSUER_INTERNAL_URL:-}
+      OIDC_BASE_URL: ${OIDC_BASE_URL:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_SECRET: ${OIDC_SECRET:-}
+    ports:
+      - "4100:3100"
+    volumes:
+      - moderate_vol:/data
+    networks:
+      app_network:
+        ipv4_address: 172.28.0.23
+    depends_on:
+      rabbitmq: { condition: service_healthy }
 
-volumes:
-  mysql_vol:
-  mongo_vol:
-  rabbitmq_vol:
-  submit_types_vol:
-  moderate_types_vol:
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: 8080
+    command: start-dev
+    ports:
+      - "8080:8080"
+    networks:
+      app_network: {}
+    profiles:
+      - oidc
+
+  kong:
+    image: kong:3.4
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/kong.yml
+      KONG_PROXY_LISTEN: "0.0.0.0:8000"
+      KONG_ADMIN_LISTEN: "0.0.0.0:8444"
+    ports:
+      - "80:8000"
+    volumes:
+      - ./gateway/kong.yml:/kong/kong.yml:ro
+    networks:
+      app_network: {}
+    depends_on:
+      - joke
+      - submit
+      - moderate

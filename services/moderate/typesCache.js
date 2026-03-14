@@ -1,6 +1,6 @@
 /**
  * Types file cache for Option 4. Updated by type_update events.
- * Bootstrap: if file empty on startup, fetch from joke service once.
+ * Bootstrap: on startup, sync from joke service so cache matches current DB (e.g. after switching MySQL/Mongo).
  */
 
 const fs = require('fs').promises;
@@ -40,19 +40,17 @@ async function addType(typeName) {
   await writeCache(types);
 }
 
-/** Bootstrap: if cache empty, fetch from joke service once. */
+/** Sync types from joke service on startup so cache matches current DB (e.g. after switching MySQL/Mongo). */
 async function bootstrapFromJoke(jokeServiceUrl) {
-  const existing = await readCache();
-  if (existing.length > 0) return;
   try {
     const base = (jokeServiceUrl || '').replace(/\/$/, '');
     if (!base) return;
     const res = await fetch(base + '/types');
     if (!res.ok) return;
     const types = await res.json();
-    if (Array.isArray(types) && types.length > 0) {
+    if (Array.isArray(types)) {
       await writeCache(types);
-      console.log('Moderate types cache bootstrapped from joke service');
+      console.log('Moderate types cache synced from joke service (' + types.length + ' types)');
     }
   } catch (err) {
     console.warn('Moderate types bootstrap failed:', err.message);

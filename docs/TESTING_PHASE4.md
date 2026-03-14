@@ -92,6 +92,13 @@ curl -s "http://localhost/joke/Phase4Test?limit=5"
 
 - With joke stopped, open http://localhost/app/moderate. “Get next” can still show jokes from the **submit** queue. Approve one; ETL will consume from **moderated** and write to DB. Types cache on moderate is updated via type_update (ETL publishes).
 
+**5.3 Switching database (Phase 5 – MySQL ↔ MongoDB)**
+
+- When you switch DB, **restart the full stack** so joke and ETL use the new DB and submit/moderate re-sync their types cache from joke:
+  - **To MongoDB:** `DB_TYPE=mongo MONGO_URI=mongodb://172.28.0.12:27017/jokedb docker compose up -d`
+  - **To MySQL:** `docker compose up -d`
+- Then check: /app/joke and /app/submit show the same types (from current DB); submit → moderate → approve → joke shows the new joke.
+
 ---
 
 ## 6. RabbitMQ (optional)
