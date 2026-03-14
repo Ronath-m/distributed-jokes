@@ -40,7 +40,12 @@ services:
     url: http://10.2.1.4:3100
     routes:
       - name: moderate-ui
-        paths: [ /app/moderate ]
+        paths:
+          - /app/moderate
+          - /app/moderate/
+          - /app/moderate/callback
+          - /app/moderate/login
+          - /app/moderate/logout
         strip_path: true
       - name: moderate-api
         paths: [ /moderate, /moderated, /moderate/types ]

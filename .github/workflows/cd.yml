@@ -45,10 +45,12 @@ jobs:
           echo "ip=${KONG_IP}" >> $GITHUB_OUTPUT
           echo "Kong public IP: ${KONG_IP}"
 
-      - name: Update Kong VM (compose only, no Keycloak – use hosted OIDC e.g. Auth0)
+      - name: Update Kong VM (compose + kong.yml for OIDC callback routes)
         run: |
-          COMPOSE_URL="https://raw.githubusercontent.com/${{ github.repository }}/main/deploy/kong/docker-compose.yml"
-          KONG_SCRIPT="cd /home/azureuser/kong && curl -sL -o docker-compose.yml '$COMPOSE_URL' && docker compose up -d"
+          BASE="https://raw.githubusercontent.com/${{ github.repository }}/main"
+          COMPOSE_URL="$BASE/deploy/kong/docker-compose.yml"
+          KONG_YML_URL="$BASE/gateway/kong-azure.example.yml"
+          KONG_SCRIPT="cd /home/azureuser/kong && curl -sL -o docker-compose.yml '$COMPOSE_URL' && curl -sL -o kong.yml '$KONG_YML_URL' && docker compose up -d"
           echo "=== Kong VM (update compose + restart) ==="
           for i in 1 2 3 4 5; do
             if az vm run-command invoke -g jokes-rg -n jokes-kong-vm --command-id RunShellScript --scripts "$KONG_SCRIPT"; then

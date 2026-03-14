@@ -52,6 +52,10 @@ services:
       - name: moderate-ui
         paths:
           - /app/moderate
+          - /app/moderate/
+          - /app/moderate/callback
+          - /app/moderate/login
+          - /app/moderate/logout
         strip_path: true
       - name: moderate-api
         paths:
