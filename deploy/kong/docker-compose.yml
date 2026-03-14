@@ -1,4 +1,4 @@
-# Kong VM – gateway. kong.yml must be in same dir (written by Terraform).
+# Kong VM – gateway only. OIDC via hosted IdP (Auth0); see docs/OIDC_AUTH0_AZURE.md.
 services:
   kong:
     image: kong:3.4

@@ -1,6 +1,6 @@
 # OIDC on Azure – do these steps in order
 
-Nothing here changes your existing VMs or apps except adding Keycloak and enabling login for the moderator. Do the steps in order.
+**Recommended for Azure:** Use **hosted OIDC (Auth0)** instead of Keycloak on the Kong VM. See **[OIDC_AUTH0_AZURE.md](./OIDC_AUTH0_AZURE.md)** for setup. The steps below describe the older Keycloak-on-Kong-VM approach (no longer used by default).
 
 ---
 
