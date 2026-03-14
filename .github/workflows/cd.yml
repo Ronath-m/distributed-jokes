@@ -50,7 +50,19 @@ jobs:
           COMPOSE_URL="https://raw.githubusercontent.com/${{ github.repository }}/main/deploy/kong/docker-compose.yml"
           KONG_SCRIPT="cd /home/azureuser/kong && curl -sL -o docker-compose.yml '$COMPOSE_URL' && docker compose up -d"
           echo "=== Kong VM (update compose + restart) ==="
-          az vm run-command invoke -g jokes-rg -n jokes-kong-vm --command-id RunShellScript --scripts "$KONG_SCRIPT" || true
+          for i in 1 2 3 4 5; do
+            if az vm run-command invoke -g jokes-rg -n jokes-kong-vm --command-id RunShellScript --scripts "$KONG_SCRIPT"; then
+              echo "Kong VM update succeeded (attempt $i)"
+              break
+            fi
+            if [ $i -lt 5 ]; then
+              echo "Run command conflict or failed (attempt $i), waiting 90s before retry..."
+              sleep 90
+            else
+              echo "Kong VM update failed after 5 attempts (continuing anyway)"
+              true
+            fi
+          done
 
       - name: Trigger redeploy on app VMs
         env:
