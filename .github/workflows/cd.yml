@@ -38,19 +38,21 @@ jobs:
             az account set --subscription "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
           fi
 
-      - name: Get Kong public IP (for OIDC base URL)
+      - name: Get Kong public IP and FQDN (for OIDC base URL)
         id: kong-ip
         run: |
           KONG_IP=$(az network public-ip list -g jokes-rg --query "[?contains(name,'kong')].ipAddress" -o tsv | head -1)
+          KONG_PIP_NAME=$(az network public-ip list -g jokes-rg --query "[?contains(name,'kong')].name" -o tsv | head -1)
+          KONG_FQDN=$(az network public-ip show -g jokes-rg -n "$KONG_PIP_NAME" --query "dnsSettings.fqdn" -o tsv 2>/dev/null || true)
           echo "ip=${KONG_IP}" >> $GITHUB_OUTPUT
-          echo "Kong public IP: ${KONG_IP}"
+          echo "fqdn=${KONG_FQDN}" >> $GITHUB_OUTPUT
+          echo "Kong public IP: ${KONG_IP}, FQDN: ${KONG_FQDN}"
 
-      - name: Update Kong VM (compose + kong.yml, Kong default TLS on 8443)
+      - name: Update Kong VM (compose + kong.yml; use Let's Encrypt compose if certs exist)
         run: |
           BASE="https://raw.githubusercontent.com/${{ github.repository }}/main"
-          COMPOSE_URL="$BASE/deploy/kong/docker-compose.yml"
           KONG_YML_URL="$BASE/gateway/kong-azure.example.yml"
-          KONG_SCRIPT="cd /home/azureuser/kong && curl -sL -o docker-compose.yml '$COMPOSE_URL' && curl -sL -o kong.yml '$KONG_YML_URL' && docker compose up -d"
+          KONG_SCRIPT="cd /home/azureuser/kong && if [ -f certs/cert.pem ]; then COMPOSE_URL=\"$BASE/deploy/kong/docker-compose-le.yml\"; else COMPOSE_URL=\"$BASE/deploy/kong/docker-compose.yml\"; fi && curl -sL -o docker-compose.yml \"\$COMPOSE_URL\" && curl -sL -o kong.yml '$KONG_YML_URL' && docker compose up -d"
           echo "=== Kong VM (update compose + restart) ==="
           for i in 1 2 3 4 5; do
             if az vm run-command invoke -g jokes-rg -n jokes-kong-vm --command-id RunShellScript --scripts "$KONG_SCRIPT"; then
@@ -69,6 +71,7 @@ jobs:
       - name: Trigger redeploy on app VMs
         env:
           KONG_IP: ${{ steps.kong-ip.outputs.ip }}
+          KONG_FQDN: ${{ steps.kong-ip.outputs.fqdn }}
           OIDC_ISSUER_BASE_URL: ${{ secrets.OIDC_ISSUER_BASE_URL }}
           OIDC_CLIENT_ID: ${{ secrets.OIDC_CLIENT_ID }}
           OIDC_CLIENT_SECRET: ${{ secrets.OIDC_CLIENT_SECRET }}
@@ -81,9 +84,11 @@ jobs:
             az vm run-command invoke -g jokes-rg -n "$vm" --command-id RunShellScript --scripts "$script"
             echo $? > "$out"
           }
-          # OIDC: use hosted IdP (Auth0) – set OIDC_ISSUER_BASE_URL, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_SECRET in GitHub Secrets
+          # OIDC: use FQDN + HTTPS when available so callback stays on same origin (fixes "checks.state" error)
           MOD_SCRIPT="cd /home/azureuser/app && git pull || true && export JOKE_IP=10.1.1.4 RABBITMQ_IP=10.0.1.5"
-          if [ -n "$KONG_IP" ]; then
+          if [ -n "$KONG_FQDN" ]; then
+            MOD_SCRIPT="$MOD_SCRIPT OIDC_BASE_URL=https://${KONG_FQDN}:8443/app/moderate"
+          elif [ -n "$KONG_IP" ]; then
             MOD_SCRIPT="$MOD_SCRIPT OIDC_BASE_URL=http://${KONG_IP}/app/moderate"
           fi
           if [ -n "$OIDC_ISSUER_BASE_URL" ]; then

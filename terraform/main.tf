@@ -199,13 +199,14 @@ resource "azurerm_virtual_network_peering" "apps_to_joke" {
   allow_gateway_transit        = false
 }
 
-# --- Public IP for Kong (single entry from internet)
+# --- Public IP for Kong (single entry from internet). domain_name_label => <label>.<region>.cloudapp.azure.com for Let's Encrypt
 resource "azurerm_public_ip" "kong_pip" {
   name                = "${var.prefix}-kong-pip"
   location            = var.region_gateway
   resource_group_name = azurerm_resource_group.rg.name
   allocation_method   = "Static"
   sku                 = "Standard"
+  domain_name_label   = var.kong_domain_name_label != "" ? var.kong_domain_name_label : null
 }
 
 # --- Public IP for submit VM (so you can SSH from your Mac for runner setup)
@@ -469,16 +470,22 @@ resource "azurerm_linux_virtual_machine" "submit" {
 locals {
   deploy_dir           = "${path.module}/../deploy"
   docker_install      = "curl -fsSL https://get.docker.com | sh && usermod -aG docker ${var.admin_username}"
-  kong_yml_b64        = base64encode(file("${path.module}/../gateway/kong-azure.example.yml"))
-  kong_compose_b64    = base64encode(file("${path.module}/../deploy/kong/docker-compose.yml"))
+  kong_yml_b64         = base64encode(file("${path.module}/../gateway/kong-azure.example.yml"))
+  kong_compose_b64     = base64encode(file("${path.module}/../deploy/kong/docker-compose.yml"))
+  kong_compose_le_b64  = base64encode(file("${path.module}/../deploy/kong/docker-compose-le.yml"))
+  kong_fqdn            = var.kong_domain_name_label != "" ? "${var.kong_domain_name_label}.${var.region_gateway}.cloudapp.azure.com" : ""
   rabbitmq_compose_b64 = base64encode(file("${path.module}/../deploy/rabbitmq/docker-compose.yml"))
-  rabbitmq_ip         = azurerm_network_interface.rabbitmq_nic.private_ip_address
-  joke_ip             = azurerm_network_interface.joke_nic.private_ip_address
-  joke_compose_b64     = base64encode(file("${path.module}/../deploy/joke/docker-compose.yml"))
-  moderate_compose_b64 = base64encode(file("${path.module}/../deploy/moderate/docker-compose.yml"))
-  submit_compose_b64   = base64encode(file("${path.module}/../deploy/submit/docker-compose.yml"))
-  # Kong: install Docker, TLS cert on VM (not in image), then write kong.yml + compose and run
-  kong_script = "${local.docker_install} && mkdir -p /home/azureuser/kong /home/azureuser/kong/certs && (test -f /home/azureuser/kong/certs/cert.pem || openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /home/azureuser/kong/certs/cert.key -out /home/azureuser/kong/certs/cert.pem -subj \"/CN=gateway\") && echo '${local.kong_yml_b64}' | base64 -d > /home/azureuser/kong/kong.yml && echo '${local.kong_compose_b64}' | base64 -d > /home/azureuser/kong/docker-compose.yml && cd /home/azureuser/kong && docker compose up -d"
+  rabbitmq_ip          = azurerm_network_interface.rabbitmq_nic.private_ip_address
+  joke_ip               = azurerm_network_interface.joke_nic.private_ip_address
+  joke_compose_b64      = base64encode(file("${path.module}/../deploy/joke/docker-compose.yml"))
+  moderate_compose_b64  = base64encode(file("${path.module}/../deploy/moderate/docker-compose.yml"))
+  submit_compose_b64    = base64encode(file("${path.module}/../deploy/submit/docker-compose.yml"))
+  # Kong: with domain_name_label + certbot_email => certbot (Let's Encrypt) then compose with cert; else default compose (Kong default cert)
+  kong_script = (var.kong_domain_name_label != "" && var.certbot_email != "") ? (
+    "${local.docker_install} && sudo apt-get update && sudo apt-get install -y certbot && mkdir -p /home/${var.admin_username}/kong && sudo certbot certonly --standalone -d ${local.kong_fqdn} --non-interactive --agree-tos -m ${var.certbot_email} && sudo mkdir -p /home/${var.admin_username}/kong/certs && sudo cp /etc/letsencrypt/live/${local.kong_fqdn}/fullchain.pem /home/${var.admin_username}/kong/certs/cert.pem && sudo cp /etc/letsencrypt/live/${local.kong_fqdn}/privkey.pem /home/${var.admin_username}/kong/certs/cert.key && sudo chown -R ${var.admin_username}:${var.admin_username} /home/${var.admin_username}/kong/certs && echo '${local.kong_yml_b64}' | base64 -d > /home/${var.admin_username}/kong/kong.yml && echo '${local.kong_compose_le_b64}' | base64 -d > /home/${var.admin_username}/kong/docker-compose.yml && cd /home/${var.admin_username}/kong && docker compose up -d"
+  ) : (
+    "${local.docker_install} && mkdir -p /home/${var.admin_username}/kong && echo '${local.kong_yml_b64}' | base64 -d > /home/${var.admin_username}/kong/kong.yml && echo '${local.kong_compose_b64}' | base64 -d > /home/${var.admin_username}/kong/docker-compose.yml && cd /home/${var.admin_username}/kong && docker compose up -d"
+  )
   # RabbitMQ: install Docker then write compose and run
   rabbitmq_script = "${local.docker_install} && mkdir -p /home/azureuser/rabbitmq && echo '${local.rabbitmq_compose_b64}' | base64 -d > /home/azureuser/rabbitmq/docker-compose.yml && cd /home/azureuser/rabbitmq && docker compose up -d"
   # Sync app repo: pull if already cloned, else clone (so taint+apply gets latest code)
@@ -498,7 +505,7 @@ resource "azurerm_virtual_machine_extension" "docker_kong" {
   settings = jsonencode({
     commandToExecute = local.kong_script
   })
-  # Kong script: Docker install + openssl cert + compose up; can take 10–20+ min on small VM
+  # Kong script: Docker install + compose up; can take 10–20+ min on small VM
   timeouts {
     create = "30m"
     update = "30m"

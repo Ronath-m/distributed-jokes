@@ -51,7 +51,7 @@ This doc reflects a full pass over the codebase and the assignment brief. **Focu
 
 ### 2.3 TLS on gateway (Mid 2:1+) ✓
 - **Brief**: SSL/TLS on the gateway.
-- **Current**: TLS implemented. Kong listens on **8443** ssl; cert on VM (Terraform + CD). See `docs/TLS_AZURE.md`, `gateway/README.md`.
+- **Current**: TLS implemented. Kong listens on **8443** ssl; Kong default cert at runtime on VM. See `docs/TLS_AZURE.md`, `gateway/README.md`.
 
 ### 2.4 Test strategy doc (Exceptional 1st)
 - **Brief**: “Test strategy” (e.g. `docs/TEST_STRATEGY.md`) – what you test, how.

@@ -52,3 +52,16 @@ variable "region_apps" {
   type        = string
   default     = "eastasia"
 }
+
+# Let's Encrypt (CA-signed cert): Azure gives you <label>.<region>.cloudapp.azure.com
+variable "kong_domain_name_label" {
+  description = "Domain name label for Kong public IP (FQDN: <label>.<region_gateway>.cloudapp.azure.com). Set for Let's Encrypt."
+  type        = string
+  default     = ""
+}
+
+variable "certbot_email" {
+  description = "Email for Let's Encrypt (required if kong_domain_name_label is set)"
+  type        = string
+  default     = ""
+}

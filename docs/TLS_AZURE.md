@@ -31,11 +31,16 @@ This script runs Kong 3.4 with the same config as Azure (proxy listen 8000 + 844
 
 1. Get the Kong public IP (e.g. `terraform output kong_public_ip` or Azure portal).
 2. **HTTP (port 80):**  
-   `http://<KONG_IP>/app/joke`, `http://<KONG_IP>/app/submit`, `http://<KONG_IP>/app/moderate`
+   `http://<KONG_IP>/app/joke`, `http://<KONG_IP>/app/submit`, `http://<KONG_IP>/app/moderate`  
+   (Browsers show "Not secure" on HTTP—normal; use HTTPS below for Secure.)
 3. **HTTPS (port 8443):**  
    `https://<KONG_IP>:8443/app/joke`, `https://<KONG_IP>:8443/app/submit`, `https://<KONG_IP>:8443/app/moderate`
 
 Browsers will show a warning for the self-signed cert; choose “Advanced” → “Proceed to …” for the demo.
+
+**Why does HTTPS still show "Not secure" or no padlock?** Kong uses a **self-signed** certificate. Browsers only show "Secure" / green padlock for certificates signed by a trusted CA. With a self-signed cert, the connection **is** encrypted (TLS), but the browser will keep showing "Not secure" or a neutral icon because it doesn't trust the cert. That's expected. For the assignment, state in the report: *TLS is enabled on the gateway (port 8443); we use a self-signed certificate for assessment, so browsers show a warning; in production we would use Let's Encrypt or another CA.*
+
+**After CD:** App VMs run `docker compose up -d --build` and can take 1–3+ minutes to be ready. If `/app/moderate` doesn't load at first, wait a few minutes and try again (or use `https://<KONG_IP>:8443/app/moderate`).
 
 ---
 

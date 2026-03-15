@@ -7,6 +7,11 @@ output "kong_public_ip" {
   description = "Use this URL for the API gateway (e.g. http://<this-ip>)"
 }
 
+output "kong_fqdn" {
+  value       = var.kong_domain_name_label != "" ? "${var.kong_domain_name_label}.${var.region_gateway}.cloudapp.azure.com" : ""
+  description = "Kong gateway FQDN when kong_domain_name_label is set (e.g. https://<this>/app/joke for Let's Encrypt padlock)"
+}
+
 output "submit_public_ip" {
   value       = azurerm_public_ip.submit_pip.ip_address
   description = "SSH to submit VM from your Mac: ssh azureuser@<this-ip>"
