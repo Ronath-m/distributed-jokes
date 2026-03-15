@@ -45,12 +45,12 @@ jobs:
           echo "ip=${KONG_IP}" >> $GITHUB_OUTPUT
           echo "Kong public IP: ${KONG_IP}"
 
-      - name: Update Kong VM (compose + kong.yml + TLS cert on VM)
+      - name: Update Kong VM (compose + kong.yml, Kong default TLS on 8443)
         run: |
           BASE="https://raw.githubusercontent.com/${{ github.repository }}/main"
           COMPOSE_URL="$BASE/deploy/kong/docker-compose.yml"
           KONG_YML_URL="$BASE/gateway/kong-azure.example.yml"
-          KONG_SCRIPT="cd /home/azureuser/kong && mkdir -p certs && (test -f certs/cert.pem || openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout certs/cert.key -out certs/cert.pem -subj '/CN=gateway') && curl -sL -o docker-compose.yml '$COMPOSE_URL' && curl -sL -o kong.yml '$KONG_YML_URL' && docker compose up -d"
+          KONG_SCRIPT="cd /home/azureuser/kong && curl -sL -o docker-compose.yml '$COMPOSE_URL' && curl -sL -o kong.yml '$KONG_YML_URL' && docker compose up -d"
           echo "=== Kong VM (update compose + restart) ==="
           for i in 1 2 3 4 5; do
             if az vm run-command invoke -g jokes-rg -n jokes-kong-vm --command-id RunShellScript --scripts "$KONG_SCRIPT"; then

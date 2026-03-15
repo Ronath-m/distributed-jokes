@@ -1,16 +1,10 @@
 #!/usr/bin/env bash
-# Test Kong 3.4 with the same TLS config as deploy/kong (Azure). Run from repo root.
+# Test Kong 3.4 with the same TLS config as deploy/kong (Azure): default Kong TLS on 8443. Run from repo root.
 # If this passes, the same config should work on the VM. Takes ~30s.
 set -e
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
-TESTDIR="${TESTDIR:-/tmp/kong-tls-test}"
-echo "=== Kong TLS local test (same config as Azure) ==="
-mkdir -p "$TESTDIR/certs"
-if [ ! -f "$TESTDIR/certs/cert.pem" ]; then
-  openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-    -keyout "$TESTDIR/certs/cert.key" -out "$TESTDIR/certs/cert.pem" -subj "/CN=gateway"
-fi
+echo "=== Kong TLS local test (same config as Azure: default cert on 8443) ==="
 echo "Starting Kong 3.4 with TLS (ports 8000, 8443)..."
 CONTAINER=$(docker run -d --rm \
   -p 18080:8000 -p 18443:8443 \
@@ -18,10 +12,7 @@ CONTAINER=$(docker run -d --rm \
   -e KONG_DECLARATIVE_CONFIG=/kong/kong.yml \
   -e "KONG_PROXY_LISTEN=0.0.0.0:8000, 0.0.0.0:8443 ssl" \
   -e KONG_ADMIN_LISTEN=0.0.0.0:8444 \
-  -e KONG_NGINX_PROXY_SSL_CERTIFICATE=/kong/certs/cert.pem \
-  -e KONG_NGINX_PROXY_SSL_CERTIFICATE_KEY=/kong/certs/cert.key \
   -v "$REPO_ROOT/gateway/kong.yml:/kong/kong.yml:ro" \
-  -v "$TESTDIR/certs:/kong/certs:ro" \
   kong:3.4)
 trap "docker stop $CONTAINER 2>/dev/null || true" EXIT
 echo "Waiting for Kong to start..."
