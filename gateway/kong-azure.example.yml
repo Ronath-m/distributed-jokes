@@ -39,13 +39,12 @@ services:
   - name: moderate-service
     url: http://10.2.1.4:3100
     routes:
+      # Prefix match: /app/moderate and /app/moderate/* (callback, login, logout)
       - name: moderate-ui
-        paths:
-          - /app/moderate
-          - /app/moderate/
-          - /app/moderate/callback
-          - /app/moderate/login
-          - /app/moderate/logout
+        paths: [ /app/moderate/ ]
+        strip_path: true
+      - name: moderate-ui-root
+        paths: [ /app/moderate ]
         strip_path: true
       - name: moderate-api
         paths: [ /moderate, /moderated, /moderate/types ]
