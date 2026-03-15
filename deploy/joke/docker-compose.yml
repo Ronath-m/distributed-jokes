@@ -1,4 +1,5 @@
-# Joke VM – MySQL + joke + ETL. RABBITMQ_IP set by Terraform.
+# Joke VM – MySQL + MongoDB + joke + ETL. RABBITMQ_IP set by Terraform.
+# Both DBs run so you can show Workbench (MySQL) and Compass (Mongo) being updated; joke/ETL use one at a time via DB_TYPE.
 services:
   mysql:
     image: mysql:8
@@ -9,6 +10,16 @@ services:
       MYSQL_PASSWORD: jokepass
     volumes:
       - mysql_vol:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo_vol:/data/db
+    ports:
+      - "27017:27017"
     restart: unless-stopped
 
   joke:
@@ -16,16 +27,18 @@ services:
     image: distributed-jokes-joke:latest
     environment:
       PORT: 3000
-      DB_TYPE: mysql
+      DB_TYPE: ${DB_TYPE:-mysql}
       DB_HOST: mysql
       DB_PORT: 3306
       DB_USER: jokeuser
       DB_PASSWORD: jokepass
       DB_NAME: jokedb
+      MONGO_URI: ${MONGO_URI:-}
     ports:
       - "3000:3000"
     depends_on:
       - mysql
+      - mongo
     restart: unless-stopped
 
   etl:
@@ -33,18 +46,21 @@ services:
     image: distributed-jokes-etl:latest
     environment:
       PORT: 3001
-      DB_TYPE: mysql
+      DB_TYPE: ${DB_TYPE:-mysql}
       DB_HOST: mysql
       DB_PORT: 3306
       DB_USER: jokeuser
       DB_PASSWORD: jokepass
       DB_NAME: jokedb
+      MONGO_URI: ${MONGO_URI:-}
       RABBITMQ_URL: amqp://guest:guest@${RABBITMQ_IP:-10.0.1.5}:5672
       MODERATED_QUEUE: moderated
       TYPE_UPDATE_EXCHANGE: type_update
     depends_on:
       - mysql
+      - mongo
     restart: unless-stopped
 
 volumes:
   mysql_vol:
+  mongo_vol:

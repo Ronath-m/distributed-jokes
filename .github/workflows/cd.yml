@@ -48,11 +48,12 @@ jobs:
           echo "fqdn=${KONG_FQDN}" >> $GITHUB_OUTPUT
           echo "Kong public IP: ${KONG_IP}, FQDN: ${KONG_FQDN}"
 
-      - name: Update Kong VM (compose + kong.yml; use Let's Encrypt compose if certs exist)
+      - name: Update Kong VM (compose + kong.yml; use Nginx+LE compose if certs exist so 8443 stays TLS)
         run: |
           BASE="https://raw.githubusercontent.com/${{ github.repository }}/main"
           KONG_YML_URL="$BASE/gateway/kong-azure.example.yml"
-          KONG_SCRIPT="cd /home/azureuser/kong && if [ -f certs/cert.pem ]; then COMPOSE_URL=\"$BASE/deploy/kong/docker-compose-le.yml\"; else COMPOSE_URL=\"$BASE/deploy/kong/docker-compose.yml\"; fi && curl -sL -o docker-compose.yml \"\$COMPOSE_URL\" && curl -sL -o kong.yml '$KONG_YML_URL' && docker compose up -d"
+          # When certs exist: use nginx-in-front compose so 8443 is nginx TLS (avoids Kong default-cert bug)
+          KONG_SCRIPT="cd /home/azureuser/kong && if [ -f certs/cert.pem ]; then curl -sL -o docker-compose.yml \"$BASE/deploy/kong/docker-compose-le-nginx.yml\" && curl -sL -o nginx-ssl.conf \"$BASE/deploy/kong/nginx-ssl.conf\"; else curl -sL -o docker-compose.yml \"$BASE/deploy/kong/docker-compose.yml\"; fi && curl -sL -o kong.yml '$KONG_YML_URL' && docker compose up -d"
           echo "=== Kong VM (update compose + restart) ==="
           for i in 1 2 3 4 5; do
             if az vm run-command invoke -g jokes-rg -n jokes-kong-vm --command-id RunShellScript --scripts "$KONG_SCRIPT"; then
@@ -67,6 +68,9 @@ jobs:
               true
             fi
           done
+          # Ensure Kong is actually running (it sometimes stays "Created" after compose up -d)
+          echo "=== Kong VM (ensure Kong container is up) ==="
+          az vm run-command invoke -g jokes-rg -n jokes-kong-vm --command-id RunShellScript --scripts 'cd /home/azureuser/kong && sleep 8 && docker compose up -d && sleep 5 && docker ps -a && curl -s -o /dev/null -w "Kong: %{http_code}\n" http://localhost:8000/app/joke || true'
 
       - name: Trigger redeploy on app VMs
         env:
