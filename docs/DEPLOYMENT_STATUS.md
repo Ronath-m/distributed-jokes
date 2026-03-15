@@ -49,10 +49,9 @@ This doc reflects a full pass over the codebase and the assignment brief. **Focu
 - **Current**: `deploy/joke/docker-compose.yml` is **MySQL only** (no MongoDB service, no `DB_TYPE=mongo` / `MONGO_URI` option).
 - **What to do**: Add optional MongoDB to deploy/joke (or a second compose profile) and pass `DB_TYPE` / `MONGO_URI` so you can demonstrate “both DBs” on Azure (e.g. in report/video).
 
-### 2.3 TLS on gateway (Mid 2:1+)
+### 2.3 TLS on gateway (Mid 2:1+) ✓
 - **Brief**: SSL/TLS on the gateway.
-- **Current**: `gateway/README.md` describes TLS (mkcert locally; Let’s Encrypt or self-signed on Azure) but Kong on Azure is deployed with **HTTP only** (port 80). No cert mount or `KONG_PROXY_LISTEN` 8443 ssl in `deploy/kong/docker-compose.yml`.
-- **What to do**: If you’re aiming for Mid 2:1+, add TLS on the Kong VM (cert on VM, Kong config for 8443 ssl) and document it.
+- **Current**: TLS implemented. Kong listens on **8443** ssl; cert on VM (Terraform + CD). See `docs/TLS_AZURE.md`, `gateway/README.md`.
 
 ### 2.4 Test strategy doc (Exceptional 1st)
 - **Brief**: “Test strategy” (e.g. `docs/TEST_STRATEGY.md`) – what you test, how.
@@ -109,7 +108,7 @@ This doc reflects a full pass over the codebase and the assignment brief. **Focu
 
 | What              | URL / How |
 |-------------------|-----------|
-| **Gateway (users)** | `http://<kong_public_ip>` from `terraform output kong_public_ip` |
+| **Gateway (users)** | `http://<kong_public_ip>` or `https://<kong_public_ip>:8443` (TLS, self-signed cert) |
 | **Joke UI**       | `http://<kong_public_ip>/app/joke` |
 | **Submit UI**     | `http://<kong_public_ip>/app/submit` |
 | **Moderate UI**   | `http://<kong_public_ip>/app/moderate` (should require OIDC once fixed) |

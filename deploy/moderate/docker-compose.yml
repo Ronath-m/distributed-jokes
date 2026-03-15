@@ -1,4 +1,4 @@
-# Moderate VM. JOKE_IP and RABBITMQ_IP set by Terraform env.
+# Moderate VM. JOKE_IP, RABBITMQ_IP from Terraform/CD. OIDC_* from CD (GitHub Secrets) when using Azure OIDC.
 services:
   moderate:
     build: ../../services/moderate
@@ -12,6 +12,12 @@ services:
       TYPES_CACHE_PATH: /data/types.json
       TYPE_UPDATE_EXCHANGE: type_update
       MOD_TYPE_UPDATE_QUEUE: mod_type_update
+      # OIDC (Azure): set by CD workflow from Kong public IP + GitHub Secrets (OIDC_CLIENT_SECRET, OIDC_SECRET)
+      OIDC_ISSUER_BASE_URL: ${OIDC_ISSUER_BASE_URL:-}
+      OIDC_BASE_URL: ${OIDC_BASE_URL:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-moderate-app}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_SECRET: ${OIDC_SECRET:-}
     ports:
       - "3100:3100"
     volumes:

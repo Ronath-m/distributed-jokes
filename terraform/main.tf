@@ -73,6 +73,36 @@ resource "azurerm_network_security_rule" "allow_ssh" {
   network_security_group_name = azurerm_network_security_group.gateway.name
 }
 
+# Keycloak (OIDC) on Kong VM – browser and moderate VM need to reach it
+resource "azurerm_network_security_rule" "allow_keycloak" {
+  name                        = "allow-keycloak"
+  priority                    = 120
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range     = "8080"
+  source_address_prefix       = "*"
+  destination_address_prefix  = "*"
+  resource_group_name         = azurerm_resource_group.rg.name
+  network_security_group_name = azurerm_network_security_group.gateway.name
+}
+
+# TLS/HTTPS on Kong (Mid 2:1+ / Exceptional)
+resource "azurerm_network_security_rule" "allow_https" {
+  name                        = "allow-https"
+  priority                    = 125
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "8443"
+  source_address_prefix       = "*"
+  destination_address_prefix  = "*"
+  resource_group_name         = azurerm_resource_group.rg.name
+  network_security_group_name = azurerm_network_security_group.gateway.name
+}
+
 resource "azurerm_subnet_network_security_group_association" "gateway" {
   subnet_id                 = azurerm_subnet.subnet_gateway.id
   network_security_group_id = azurerm_network_security_group.gateway.id
@@ -447,8 +477,8 @@ locals {
   joke_compose_b64     = base64encode(file("${path.module}/../deploy/joke/docker-compose.yml"))
   moderate_compose_b64 = base64encode(file("${path.module}/../deploy/moderate/docker-compose.yml"))
   submit_compose_b64   = base64encode(file("${path.module}/../deploy/submit/docker-compose.yml"))
-  # Kong: install Docker then write kong.yml + compose and run
-  kong_script = "${local.docker_install} && mkdir -p /home/azureuser/kong && echo '${local.kong_yml_b64}' | base64 -d > /home/azureuser/kong/kong.yml && echo '${local.kong_compose_b64}' | base64 -d > /home/azureuser/kong/docker-compose.yml && cd /home/azureuser/kong && docker compose up -d"
+  # Kong: install Docker, TLS cert on VM (not in image), then write kong.yml + compose and run
+  kong_script = "${local.docker_install} && mkdir -p /home/azureuser/kong /home/azureuser/kong/certs && (test -f /home/azureuser/kong/certs/cert.pem || openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /home/azureuser/kong/certs/cert.key -out /home/azureuser/kong/certs/cert.pem -subj \"/CN=gateway\") && echo '${local.kong_yml_b64}' | base64 -d > /home/azureuser/kong/kong.yml && echo '${local.kong_compose_b64}' | base64 -d > /home/azureuser/kong/docker-compose.yml && cd /home/azureuser/kong && docker compose up -d"
   # RabbitMQ: install Docker then write compose and run
   rabbitmq_script = "${local.docker_install} && mkdir -p /home/azureuser/rabbitmq && echo '${local.rabbitmq_compose_b64}' | base64 -d > /home/azureuser/rabbitmq/docker-compose.yml && cd /home/azureuser/rabbitmq && docker compose up -d"
   # Sync app repo: pull if already cloned, else clone (so taint+apply gets latest code)
@@ -468,6 +498,11 @@ resource "azurerm_virtual_machine_extension" "docker_kong" {
   settings = jsonencode({
     commandToExecute = local.kong_script
   })
+  # Kong script: Docker install + openssl cert + compose up; can take 10–20+ min on small VM
+  timeouts {
+    create = "30m"
+    update = "30m"
+  }
 }
 
 resource "azurerm_virtual_machine_extension" "docker_rabbitmq" {

@@ -39,12 +39,39 @@ services:
   - name: moderate-service
     url: http://10.2.1.4:3100
     routes:
-      # Prefix match: /app/moderate and /app/moderate/* (callback, login, logout)
-      - name: moderate-ui
-        paths: [ /app/moderate/ ]
-        strip_path: true
+      # OIDC callback: exact path, rewrite URI so upstream receives /callback (query preserved)
+      - name: moderate-callback
+        paths: [ /app/moderate/callback ]
+        strip_path: false
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: "/callback"
+      # Login/logout – exact paths, rewrite so upstream gets /login and /logout
+      - name: moderate-login
+        paths: [ /app/moderate/login ]
+        strip_path: false
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: "/login"
+      - name: moderate-logout
+        paths: [ /app/moderate/logout ]
+        strip_path: false
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: "/logout"
+      # UI: exact path /app/moderate (strip so upstream gets /)
       - name: moderate-ui-root
         paths: [ /app/moderate ]
+        strip_path: true
+      # UI: /app/moderate/ with trailing slash (strip so upstream gets /)
+      - name: moderate-ui
+        paths: [ /app/moderate/ ]
         strip_path: true
       - name: moderate-api
         paths: [ /moderate, /moderated, /moderate/types ]

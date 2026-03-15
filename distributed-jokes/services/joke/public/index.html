@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Random Joke &mdash; Distributed Jokes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <base id="base" href="/">
+  <script>document.getElementById('base').href = (document.location.pathname.replace(/\/?$/, '/') || '/');</script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <a href="/app/joke" class="nav-brand">Distributed Jokes</a>
+    <div class="nav-links">
+      <a href="/app/joke" class="nav-link active">Joke</a>
+      <a href="/app/submit" class="nav-link">Submit</a>
+      <a href="/app/moderate" class="nav-link">Moderate</a>
+    </div>
+  </nav>
+  <main class="page">
+    <header class="page-header">
+      <h1>Random Joke</h1>
+      <p class="page-desc">Pick a category and get a joke. The punchline appears after a few seconds.</p>
+    </header>
+    <section class="card card-main">
+      <label for="type" class="label">Category</label>
+      <select id="type" class="input" aria-label="Joke category"></select>
+      <button type="button" id="getJoke" class="btn btn-primary">Get a joke</button>
+      <div id="result" class="result-box">
+        <p id="setup" class="result-setup"></p>
+        <p id="punchline" class="result-punchline hidden"></p>
+      </div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
