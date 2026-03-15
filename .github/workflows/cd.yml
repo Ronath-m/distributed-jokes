@@ -45,7 +45,7 @@ jobs:
           echo "ip=${KONG_IP}" >> $GITHUB_OUTPUT
           echo "Kong public IP: ${KONG_IP}"
 
-      - name: Update Kong VM (compose + kong.yml + TLS cert)
+      - name: Update Kong VM (compose + kong.yml + TLS cert on VM)
         run: |
           BASE="https://raw.githubusercontent.com/${{ github.repository }}/main"
           COMPOSE_URL="$BASE/deploy/kong/docker-compose.yml"

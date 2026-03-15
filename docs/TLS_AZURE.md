@@ -7,12 +7,25 @@ The gateway exposes **HTTPS on port 8443** so you can demonstrate SSL/TLS for th
 ## What’s in place
 
 - **Terraform**: NSG allows inbound **8443** (HTTPS) on the Kong VM.
-- **deploy/kong/docker-compose.yml**: Kong listens on `0.0.0.0:8000` (HTTP) and `0.0.0.0:8443 ssl` (HTTPS). Cert and key are mounted from `./certs` and set via `KONG_SSL_CERT` and `KONG_SSL_CERT_KEY`.
+- **deploy/kong/docker-compose.yml**: Kong listens on `0.0.0.0:8000` (HTTP) and `0.0.0.0:8443 ssl` (HTTPS). Cert and key are mounted from `./certs` and set via `KONG_NGINX_PROXY_SSL_CERTIFICATE` and `KONG_NGINX_PROXY_SSL_CERTIFICATE_KEY` (proxy server block).
 - **Cert on VM**: A **self-signed** certificate is created on the Kong VM:
   - **Terraform** (first provision): CustomScript creates `/home/azureuser/kong/certs` and runs `openssl req -x509 ...` if `cert.pem` doesn’t exist.
   - **CD** (every Kong VM update): The workflow script creates `certs` and generates the cert if missing, then runs `docker compose up -d`.
 
 So TLS is enabled with a **self-signed cert** for assessment. In production you would use **Let’s Encrypt** or another CA and (optionally) a domain name.
+
+---
+
+## Test locally before deploying (~30 s)
+
+To avoid a 40‑minute deploy only to find Kong won’t start with TLS, run the same Kong config in Docker on your machine:
+
+```bash
+# From repo root; requires Docker running
+./scripts/test-kong-tls-local.sh
+```
+
+This script: creates a self-signed cert, runs Kong 3.4 with the same env and volume layout as Azure (proxy listen 8000 + 8443 ssl, nginx_proxy_ssl_certificate), then checks HTTP and HTTPS. If it prints **PASS**, the Azure deploy should work. If it fails, fix the config or cert and re-run until it passes.
 
 ---
 
