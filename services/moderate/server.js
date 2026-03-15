@@ -35,6 +35,8 @@ const oidcSecret = process.env.OIDC_CLIENT_SECRET;
 const oidcEnabled = Boolean(oidcSecret && process.env.OIDC_ISSUER_BASE_URL && process.env.OIDC_BASE_URL && process.env.OIDC_CLIENT_ID);
 if (oidcEnabled) {
   const { auth } = require('express-openid-connect');
+  // After login/logout, redirect to this path so Kong routes to us; '/' would hit site root and "no Route matched"
+  const oidcBasePath = process.env.OIDC_BASE_URL ? new URL(process.env.OIDC_BASE_URL).pathname.replace(/\/$/, '') || '/app/moderate' : '/app/moderate';
   app.use(
     auth({
       issuerBaseURL: process.env.OIDC_ISSUER_BASE_URL,
@@ -48,7 +50,7 @@ if (oidcEnabled) {
         scope: 'openid profile email',
       },
       getLoginState() {
-        return { returnTo: '/' };
+        return { returnTo: oidcBasePath };
       },
       routes: {
         login: false,
@@ -57,8 +59,8 @@ if (oidcEnabled) {
       },
     })
   );
-  app.get('/login', (req, res) => res.oidc.login({ returnTo: '/' }));
-  app.get('/logout', (req, res) => res.oidc.logout({ returnTo: req.query.returnTo || '/' }));
+  app.get('/login', (req, res) => res.oidc.login({ returnTo: oidcBasePath }));
+  app.get('/logout', (req, res) => res.oidc.logout({ returnTo: req.query.returnTo || oidcBasePath }));
 }
 
 // GET /moderate – one joke from submit queue or noJoke
